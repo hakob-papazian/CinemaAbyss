@@ -486,6 +486,43 @@ minikube tunnel
 https://cinemaabyss.example.com/api/movies
 и приложите скриншот развертывания helm и вывода https://cinemaabyss.example.com/api/movies
 
+## Выполнение (мой ответ)
+
+1. **`values.yaml`** — пути образов для всех четырёх сервисов (`monolith`, `proxyService`,
+   `moviesService`, `eventsService`) переведены на реальный
+   `ghcr.io/hakob-papazian/cinemaabyss/*`. `imagePullSecrets.dockerconfigjson` заполнен валидным
+   base64 (образы публичные, реальный PAT не требуется — см. комментарий в файле). Порядок путей
+   ingress поправлен: `/api/events` идёт раньше общего `/`, как и в «сырых» манифестах из
+   Задания 3.
+2. **`templates/services/proxy-service.yaml`** и **`templates/services/events-service.yaml`** —
+   заполнены по образцу уже готовых `monolith.yaml`/`movies-service.yaml`: Deployment (порт,
+   `envFrom` на `cinemaabyss-config`/`cinemaabyss-secrets`, readiness/liveness на `/health` и
+   `/api/events/health`, `imagePullSecrets`) + Service с портами из `values.yaml`.
+3. По пути заодно нашёл и поправил баг в `templates/configmap.yaml`, оставшийся от шаблона:
+   `MOVIES_SERVICE_URL` указывал на несуществующий сервис `movies` вместо `movies-service` —
+   proxy-service не смог бы достучаться до movies. Добавил туда же `EVENTS_SERVICE_URL` и
+   `KAFKA_BROKERS`, которые нужны новым сервисам, но отсутствовали. Обновил пути образов и в
+   `README.md` чарта.
+4. **Проверка** (`helm lint` → чисто; `helm template --dry-run` против живого кластера → рендерится
+   без ошибок, проверил сгенерированные proxy/events/configmap манифесты вручную):
+   - Снёс ручную установку из Задания 3: `kubectl delete all --all -n cinemaabyss` +
+     `kubectl delete namespace cinemaabyss`.
+   - `helm install cinemaabyss .\src\kubernetes\helm --namespace cinemaabyss --create-namespace` —
+     все 7 подов `Running` **за 29 секунд** (быстрее, чем ручной деплой по шагам).
+   - `https://cinemaabyss.example.com/api/movies` (тот же `minikube tunnel` + hosts-запись) —
+     список фильмов, работает один в один как в Задании 3:
+     [`docs/screenshots/helm-api-movies.png`](./docs/screenshots/helm-api-movies.png)
+   - Скриншот установки (`kubectl delete` → `helm install` → `kubectl get pod`, все `1/1 Running`):
+     [`docs/screenshots/helm-install-pods.png`](./docs/screenshots/helm-install-pods.png)
+   - `npm run test:kubernetes` на Helm-деплое — **22/22 запросов, 42/42 проверок, всё зелёное**,
+     так же, как и в Задании 3.
+   - Задел на канареечные релизы: `helm upgrade cinemaabyss .\src\kubernetes\helm --reuse-values
+     --set config.moviesMigrationPercent="0"` (+ `kubectl rollout restart deployment
+     proxy-service`, т.к. флаг читается при старте пода) реально переключил 10/10 запросов на
+     монолит; обратный `--set config.moviesMigrationPercent="100"` вернул 10/10 на
+     `movies-service`. Это и есть ручка для будущих канареек — трафик между монолитом и
+     микросервисом регулируется одним `helm upgrade --set`, без правки шаблонов.
+
 ## Удаляем все
 
 ```bash
