@@ -11,8 +11,8 @@ spec:
     - host: cinemaabyss.example.com
       http:
         paths:
-          #дополните конфигурацию для /
-          ...
+          # Домен events уже полностью вынесен из монолита - идёт напрямую в events-service,
+          # минуя Gateway (должен стоять раньше "/", иначе его перехватит общий префикс).
           - path: /api/events
             pathType: Prefix
             backend:
@@ -20,3 +20,12 @@ spec:
                 name: events-service
                 port:
                   number: 8082
+          # Всё остальное (movies, users, payments, subscriptions, /health) идёт через
+          # proxy-service - единую точку входа, реализующую Strangler Fig для /api/movies.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: proxy-service
+                port:
+                  number: 8000
