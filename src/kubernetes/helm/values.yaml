@@ -4,8 +4,14 @@ global:
   domain: cinemaabyss.example.com
 
 # Image pull secrets
+# Образы в этом проекте публичные (ghcr.io/hakob-papazian/cinemaabyss/*), поэтому реальный
+# токен не нужен - ниже валидный, но пустой dockerconfigjson
+# (echo -n '{"auths":{"ghcr.io":{}}}' | base64), чтобы Secret вообще мог примениться.
+# Если сделаете пакеты приватными - замените на base64 от ~/.docker/config.json с настоящим
+# PAT (scope read:packages).
 imagePullSecrets:
-  dockerconfigjson: ewoJImF1dGhzIjogewoJCSJnaGNyLmlvIjogewoJCQkiYXV0aCI6
+  dockerconfigjson: eyJhdXRocyI6eyJnaGNyLmlvIjp7fX19
+
 # Database configuration
 database:
   host: postgres
@@ -33,7 +39,7 @@ database:
 monolith:
   enabled: true
   image:
-    repository: ghcr.io/db-exp/cinemaabysstest/monolith
+    repository: ghcr.io/hakob-papazian/cinemaabyss/monolith
     tag: latest
     pullPolicy: Always
   replicas: 1
@@ -53,7 +59,7 @@ monolith:
 proxyService:
   enabled: true
   image:
-    repository: ghcr.io/db-exp/cinemaabysstest/proxy-service
+    repository: ghcr.io/hakob-papazian/cinemaabyss/proxy-service
     tag: latest
     pullPolicy: Always
   replicas: 1
@@ -73,7 +79,7 @@ proxyService:
 moviesService:
   enabled: true
   image:
-    repository: ghcr.io/db-exp/cinemaabysstest/movies-service
+    repository: ghcr.io/hakob-papazian/cinemaabyss/movies-service
     tag: latest
     pullPolicy: Always
   replicas: 1
@@ -93,7 +99,7 @@ moviesService:
 eventsService:
   enabled: true
   image:
-    repository: ghcr.io/db-exp/cinemaabysstest/events-service
+    repository: ghcr.io/hakob-papazian/cinemaabyss/events-service
     tag: latest
     pullPolicy: Always
   replicas: 1
@@ -169,14 +175,18 @@ ingress:
   hosts:
     - host: cinemaabyss.example.com
       paths:
-        - path: /
-          pathType: Prefix
-          service: proxy-service
-          port: 80
+        # Домен events уже полностью вынесен из монолита - идёт напрямую в events-service,
+        # минуя Gateway.
         - path: /api/events
           pathType: Prefix
           service: events-service
           port: 8082
+        # Всё остальное (movies, users, payments, subscriptions, /health) идёт через
+        # proxy-service - единую точку входа, реализующую Strangler Fig для /api/movies.
+        - path: /
+          pathType: Prefix
+          service: proxy-service
+          port: 80
 
 # Application configuration
 config:
