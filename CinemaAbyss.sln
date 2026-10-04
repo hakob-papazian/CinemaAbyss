@@ -11,6 +11,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "microservices", "microservi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CinemaAbyss.MoviesService", "src\microservices\movies\CinemaAbyss.MoviesService.csproj", "{1675B111-485A-4D1D-B1A7-FD678470AB7D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CinemaAbyss.ProxyService", "src\microservices\proxy\CinemaAbyss.ProxyService.csproj", "{C887CEAC-C9E3-41AF-B55B-AE60A921EB94}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CinemaAbyss.EventsService", "src\microservices\events\CinemaAbyss.EventsService.csproj", "{93E069DA-65D2-4285-99DC-0CC9047A54BC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,10 +32,20 @@ Global
 		{1675B111-485A-4D1D-B1A7-FD678470AB7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1675B111-485A-4D1D-B1A7-FD678470AB7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1675B111-485A-4D1D-B1A7-FD678470AB7D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C887CEAC-C9E3-41AF-B55B-AE60A921EB94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C887CEAC-C9E3-41AF-B55B-AE60A921EB94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C887CEAC-C9E3-41AF-B55B-AE60A921EB94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C887CEAC-C9E3-41AF-B55B-AE60A921EB94}.Release|Any CPU.Build.0 = Release|Any CPU
+		{93E069DA-65D2-4285-99DC-0CC9047A54BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93E069DA-65D2-4285-99DC-0CC9047A54BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93E069DA-65D2-4285-99DC-0CC9047A54BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93E069DA-65D2-4285-99DC-0CC9047A54BC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B9736606-BF79-47EC-821B-22F0BA8558DA} = {E274DA2E-8A25-4237-BB8C-5DED65F95DC4}
 		{0A7FBBE7-8A3C-4220-9D69-22D7648F28BB} = {E274DA2E-8A25-4237-BB8C-5DED65F95DC4}
 		{1675B111-485A-4D1D-B1A7-FD678470AB7D} = {0A7FBBE7-8A3C-4220-9D69-22D7648F28BB}
+		{C887CEAC-C9E3-41AF-B55B-AE60A921EB94} = {0A7FBBE7-8A3C-4220-9D69-22D7648F28BB}
+		{93E069DA-65D2-4285-99DC-0CC9047A54BC} = {0A7FBBE7-8A3C-4220-9D69-22D7648F28BB}
 	EndGlobalSection
 EndGlobal

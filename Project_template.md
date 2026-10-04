@@ -59,6 +59,77 @@
 Необходимые тесты для проверки этого API вызываются при запуске npm run test:local из папки tests/postman 
 Приложите скриншот тестов и скриншот состояния топиков Kafka из UI http://localhost:8090 
 
+## Выполнение (мой ответ)
+
+### 1. Proxy (API Gateway, Strangler Fig)
+
+Реализован в `./src/microservices/proxy` на .NET 8 (ASP.NET Core Minimal API). Логика:
+
+- `/health` — health-check самого шлюза (`text/plain`, как того требует `api-specification.yaml`).
+- `/api/movies*` — домен миграции. Решение, куда направить **каждый конкретный запрос**, принимает
+  `Routing/MigrationFlag.cs`:
+  - `GRADUAL_MIGRATION=false` → 100% трафика идёт в монолит (откат/до начала миграции);
+  - `GRADUAL_MIGRATION=true` → `MOVIES_MIGRATION_PERCENT` % запросов уходит в `movies-service`,
+    остальное — в монолит. Решение случайное на каждый запрос (`Random.Shared`), поэтому процент
+    выдерживается статистически без sticky-сессий.
+  - Ответ помечается заголовком `X-Routed-To: monolith|movies-service` — удобно для отладки/проверки.
+- `/api/users`, `/api/payments`, `/api/subscriptions` — домены, ещё не вынесенные из монолита,
+  всегда проксируются в монолит.
+- `/api/events/*` — уже вынесенный домен событий, всегда проксируется в `events-service`.
+- `Routing/ProxyForwarder.cs` — прозрачно передаёт метод, заголовки, query string и тело запроса на
+  бэкенд и стримит ответ обратно клиенту (включая код статуса и Content-Type).
+
+**Запрос к API Gateway:**
+```bash
+curl http://localhost:8000/api/movies
+```
+Выполнено локально — ответ `200 OK` со списком фильмов, прошёл как через монолит, так и через
+`movies-service` в зависимости от фиче-флага (см. ниже).
+
+**Проверка постепенного перехода** (реальный прогон, не докер-окружение CI, а руками на этой машине):
+
+| `GRADUAL_MIGRATION` | `MOVIES_MIGRATION_PERCENT` | 10–20 запросов к `/api/movies` → распределение |
+|---|---|---|
+| `true` | `50` | 13× monolith / 7× movies-service (≈50/50 на выборке) |
+| `true` | `100` | 10× movies-service / 0× monolith |
+| `false` | `100` (игнорируется) | 10× monolith / 0× movies-service |
+
+Итоговые значения в `docker-compose.yml` возвращены к `GRADUAL_MIGRATION: "true"` /
+`MOVIES_MIGRATION_PERCENT: "50"` — рабочая конфигурация по умолчанию.
+
+### 2. Events (Kafka MVP)
+
+Реализован в `./src/microservices/events` на .NET 8 + `Confluent.Kafka`:
+
+- **Producer** (`Kafka/EventProducer.cs`) — публикует событие в нужный топик
+  (`movie-events` / `user-events` / `payment-events`) и возвращает `partition`/`offset` по спецификации.
+- **Consumer** (`Kafka/EventConsumer.cs`) — `BackgroundService`, подписан на все три топика
+  (`GroupId=events-service-consumer`, `AutoOffsetReset=Earliest`) и логирует каждое прочитанное
+  сообщение — это и есть проверка гипотезы «сервис сам создаёт и сам читает сообщения».
+- **API** (`Endpoints/EventsEndpoints.cs`) по `api-specification.yaml`:
+  `GET /api/events/health`, `POST /api/events/movie|user|payment` → `201` + `EventResponse`.
+- Сервис добавлен в `docker-compose.yml` (контекст сборки, порт `8082`, `KAFKA_BROKERS=kafka:9092`
+  — секция уже была в шаблоне).
+
+Round-trip подтверждён логами контейнера (`docker logs cinemaabyss-events-service`):
+```
+info: CinemaAbyss.EventsService.Kafka.EventProducer[0]
+      Produced event movie-1-viewed-... (movie) to topic movie-events [partition 0, offset 0]
+info: CinemaAbyss.EventsService.Kafka.EventConsumer[0]
+      Consumed event from topic movie-events [partition 0, offset 0]: {"id":"movie-1-viewed-...",...}
+```
+(аналогично для `user-events` и `payment-events`).
+
+**Тесты Postman** (`npx newman run CinemaAbyss.postman_collection.json -e local.environment.json`,
+эквивалент `npm run test:local`): **22/22 запросов, 42/42 проверок — всё зелёное**, включая Events и
+Proxy Service (по заданию допускались незелёные только у events, но в моей реализации зелено и там).
+
+Скриншот прогона тестов: [`docs/screenshots/postman-tests-results.png`](./docs/screenshots/postman-tests-results.png)
+
+Скриншот топиков Kafka в UI (http://localhost:8090) — видно `movie-events`, `payment-events`,
+`user-events`, по 3 сообщения в каждом (произведены и тут же прочитаны сервисом):
+[`docs/screenshots/kafka-ui-topics.png`](./docs/screenshots/kafka-ui-topics.png)
+
 # Задание 3
 
 Команда начала переезд в Kubernetes для лучшего масштабирования и повышения надежности. 
