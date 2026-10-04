@@ -346,6 +346,71 @@ cat .docker/config.json | base64
 #### Шаг 3
 Добавьте сюда скриншота вывода при вызове https://cinemaabyss.example.com/api/movies и  скриншот вывода event-service после вызова тестов.
 
+## Выполнение (мой ответ)
+
+### Часть 1. CI/CD
+
+- `.github/workflows/docker-build-push.yml`: добавлены шаги сборки и публикации образов для
+  Proxy Service и Events Service (metadata-action + build-push-action, по аналогии с Monolith и
+  Movies), триггер расширен на ветку `cinema` (чтобы CI отработал ещё до мерджа в `main`).
+- `.github/workflows/api-tests.yml`: триггер push/PR тоже расширен на `cinema`. Сам джоб не
+  менялся — `docker compose up` уже поднимает все 6 сервисов (включая proxy и events) из
+  Dockerfile'ов в репозитории, поэтому отдельных правок для новых сервисов не потребовалось.
+- Запушено в реальный репозиторий: https://github.com/hakob-papazian/CinemaAbyss (ветка `cinema`).
+  **Обе сборки зелёные**: `Docker Build and Push` ✅ и `API Tests` ✅
+  (https://github.com/hakob-papazian/CinemaAbyss/actions).
+- Образы опубликованы в GHCR и сделаны **публичными** (анонимный `docker pull` подтверждён для
+  всех четырёх): `ghcr.io/hakob-papazian/cinemaabyss/{monolith,movies-service,proxy-service,events-service}:latest`.
+  Поэтому `dockerconfigsecret.yaml` заполнен валидным, но пустым `.dockerconfigjson` — реальный
+  PAT не нужен, пока пакеты публичные (в файле оставлен комментарий, как подставить настоящий
+  токен, если их сделать приватными).
+
+### Часть 2. Proxy и Events в Kubernetes
+
+- `src/kubernetes/proxy-service.yaml` и `src/kubernetes/events-service.yaml` — Deployment + Service
+  по образцу `monolith.yaml`/`movies-service.yaml` (readiness/liveness на `/health` и
+  `/api/events/health`, env через `cinemaabyss-config`/`cinemaabyss-secrets`).
+- `src/kubernetes/configmap.yaml` — добавлены `EVENTS_SERVICE_URL` и `KAFKA_BROKERS`.
+- `src/kubernetes/ingress.yaml` — путь `/` ведёт в `proxy-service` (единая точка входа для
+  movies/users/payments/subscriptions/health), `/api/events` оставлен напрямую на
+  `events-service` (этот домен уже полностью вынесен, через Gateway его не пускаем).
+- Пути образов в `monolith.yaml`, `movies-service.yaml`, `proxy-service.yaml`,
+  `events-service.yaml` указывают на реальный GHCR-репозиторий (см. выше).
+
+**Кластер**: локальный minikube (драйвер docker, добавлен ingress addon) — поднят с нуля по
+шагам из этого файла. Результат `kubectl -n cinemaabyss get pod`:
+```
+NAME                              READY   STATUS    RESTARTS   AGE
+events-service-5f95f8ff66-znd8f   1/1     Running   0          6m
+kafka-0                           1/1     Running   0          9m
+monolith-5b9d6bd9b6-nnpv6         1/1     Running   0          7m
+movies-service-74bddd977-qzxlm    1/1     Running   0          6m
+postgres-0                        1/1     Running   0          10m
+proxy-service-5f5f87c97b-lzlcs    1/1     Running   0          2m
+zookeeper-0                       1/1     Running   0          9m
+```
+— совпадает с ожидаемым выводом из инструкции.
+
+**Strangler Fig в деле**: при `MOVIES_MIGRATION_PERCENT=100` (значение по умолчанию в
+`configmap.yaml`) все вызовы `/api/movies` подтверждённо уходят в `movies-service`
+(проверено заголовком `X-Routed-To` и 10/10 запросами). Временно выставлял `0` и
+`GRADUAL_MIGRATION` через `kubectl patch configmap` + `rollout restart proxy-service` — трафик
+так же надёжно переключался на монолит (10/10). Возвращено в `100`.
+
+**Вызов https://cinemaabyss.example.com/api/movies** (через `minikube tunnel` + запись в hosts) —
+список фильмов отдаётся корректно:
+[`docs/screenshots/k8s-api-movies.png`](./docs/screenshots/k8s-api-movies.png)
+
+**Тесты из tests/postman** (`npm run test:kubernetes`, окружение `kubernetes.environment.json`,
+реальный домен `cinemaabyss.example.com`) — **22/22 запросов, 42/42 проверок, всё зелёное**
+(в моей реализации ни один health-check не упал — задание предупреждало, что часть может упасть,
+но Strangler Fig и маршруты ingress в этой реализации покрывают все health-эндпоинты корректно):
+[`docs/screenshots/k8s-postman-tests-results.png`](./docs/screenshots/k8s-postman-tests-results.png)
+
+**Логи event-service** после прогона тестов — видно `Produced event ... -> Consumed event ...`
+для movie/user/payment событий (offset 0 и offset 1 — от ручной проверки и от прогона тестов):
+[`docs/screenshots/k8s-events-service-logs.png`](./docs/screenshots/k8s-events-service-logs.png)
+
 
 # Задание 4
 Для простоты дальнейшего обновления и развертывания вам как архитектуру необходимо так же реализовать helm-чарты для прокси-сервиса и проверить работу 
