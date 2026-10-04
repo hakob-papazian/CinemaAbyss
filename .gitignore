@@ -1,0 +1,125 @@
+# .NET specific
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userprefs
+*.nupkg
+*.snupkg
+project.lock.json
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# .NET test results and coverage
+TestResults/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# IDE specific files
+.vs/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.history/
+*.sublime-workspace
+*.sublime-project
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+.kube/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+dist/
+build/
+out/
+target/
+.gradle/
+
+# Node.js (for frontend or Node.js services)
+node_modules/
+npm-debug.log
+yarn-error.log
+.pnp/
+.pnp.js
+coverage/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+reports/
+
+# Postman
+newman/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Helm
+.helm/
+charts/*/charts/
+charts/*/requirements.lock
+
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+
+# Postman tests reports
+tests/postman/reports/
+.vs/
